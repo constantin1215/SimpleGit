@@ -5,5 +5,9 @@ fun main() {
 
     rep.showDirectoryContent()
 
-    rep.stage("testDir1/testDir1File.txt")
+    rep.commit("bob", "added stuff")
+    rep.commit("bob", "added stuff")
+    rep.commit("bob", "added stuff")
+
+    rep.listCommits()
 }

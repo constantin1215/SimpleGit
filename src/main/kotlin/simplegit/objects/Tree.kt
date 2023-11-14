@@ -10,7 +10,7 @@ class Tree(hash : String) : CompositeElement(hash) {
     fun removeElement(blob: CompositeElement) = elements.remove(blob)
 
     fun recalculateHash() {
-        hash = HashGenerator.generateSHA1(elements.map { it.hash }.joinToString(""))
+        hash = HashGenerator.generateSHA1(hash + elements.joinToString("") { it.hash })
     }
 
     override fun toString(): String {
