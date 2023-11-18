@@ -11,7 +11,7 @@ class Commit(
 ) {
     override fun toString(): String {
         return "Commit $hash\n" +
-                "Root ID: ${root.hash}\n" +
+                "Root ID: ${root}\n" +
                 "Author: $author\n" +
                 "Date: $commitTime\n\n" +
                 "$message\n"

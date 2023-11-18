@@ -21,7 +21,7 @@ class CommitRepository(private val pathToDir: String) {
     private val trees = mutableMapOf<String, Tree>()
     private val commits = mutableListOf<Commit>()
 
-    private var currentUser = ""
+    private var currentUser = "test"
 
     init {
         scan()
@@ -73,15 +73,15 @@ class CommitRepository(private val pathToDir: String) {
         println("\nType 'git help' to see available commands.")
         while (true) {
             print(">>>  ")
-            val input = Scanner(System.`in`).nextLine()
-            val command = if (input.count { it == ' ' } > 1) input.substringBeforeLast(' ') else input
+            val input = Scanner(System.`in`).nextLine().split(' ')
+            val command = "${input[0]} ${input[1]}"
             when(command) {
                 "git help" -> help()
                 "git credentials" -> enterCredentials()
                 "git ls-files" -> showDirectoryContent()
                 "git status" -> printStatus()
-                "git add" -> stageFiles(input.substringAfterLast(' '))
-                "git commit" -> commit(input)
+                "git add" -> stageFiles(input[2])
+                "git commit" -> commit(input.drop(2).joinToString(" "))
                 "git log" -> listCommits()
                 "exit" -> {
                     println("Goodbye!")
@@ -94,13 +94,14 @@ class CommitRepository(private val pathToDir: String) {
 
     private fun help() {
         println("SimpleGit Commands:")
-        println("  git help       - Display available commands and their descriptions.")
-        println("  git ls-files   - Show the content of the directory.")
-        println("  git status     - Print the current staging status of files.")
-        println("  git add        - Stage changes in the directory.")
-        println("  git commit     - Commits the staged files. It MUST contain the '-m' flag set the commit message.")
-        println("  git log        - List the commit history.")
-        println("  exit           - Quit the Git command-line interface.")
+        println("  git help        - Display available commands and their descriptions.")
+        println("  git credentials - Set author.")
+        println("  git ls-files    - Show the content of the directory.")
+        println("  git status      - Print the current staging status of files.")
+        println("  git add         - Stage changes in the directory.")
+        println("  git commit      - Commits the staged files. It MUST contain the '-m' flag set the commit message.")
+        println("  git log         - List the commit history.")
+        println("  exit            - Quit the Git command-line interface.")
     }
 
     private fun stageFiles(path: String) {
@@ -120,21 +121,23 @@ class CommitRepository(private val pathToDir: String) {
 
     private fun commitFiles() {
         files.forEach {
-            val content = File(pathToDir + it).readText()
-            blobs[it] = Blob(HashGenerator.generateSHA1(it + content), content)
+            if (stagingStatus[STATUS.STAGED]!!.contains(it)) {
+                val content = File(pathToDir + it).readText()
+                blobs[it] = Blob(HashGenerator.generateSHA1(it + content), content)
+            }
         }
 
         directories.forEach {
             trees[it.key] = Tree(HashGenerator.generateSHA1(it.key))
 
             for (fileName in it.value)
-                if (fileName in files)
-                    trees[it.key]!!.addElement(blobs[fileName]!!)
+                if (fileName in files && stagingStatus[STATUS.STAGED]!!.contains(fileName))
+                        trees[it.key]!!.addElement(blobs[fileName]!!)
         }
 
         directories.forEach {
             for (fileName in it.value)
-                if (fileName in directories.keys)
+                if (fileName in directories.keys && stagingStatus[STATUS.STAGED]!!.contains(fileName))
                     trees[it.key]!!.addElement(trees[fileName]!!)
 
             trees[it.key]!!.recalculateHash()
@@ -142,6 +145,11 @@ class CommitRepository(private val pathToDir: String) {
     }
 
     private fun commit(input : String) {
+        if (currentUser == "") {
+            println("Please set an user before committing. Use 'git credentials'.")
+            return
+        }
+
         if (!input.contains("-m")) {
             println("Command does not contain '-m' option so I cannot identify the commit message. :(")
             return
@@ -161,6 +169,7 @@ class CommitRepository(private val pathToDir: String) {
         )
 
         commits.add(commit)
+        println("Commit successfull!")
     }
 
     private fun showDirectoryContent() {
@@ -218,7 +227,7 @@ class CommitRepository(private val pathToDir: String) {
             return
         }
 
-        println("Nothing has been staged. Perhaps wrong path or file does not exists.")
+        println("Nothing has been staged. Perhaps wrong path or file does not exists. Don't forget about the '/' at the beginning of the path!")
     }
 
     private fun printStatus() {
@@ -228,6 +237,6 @@ class CommitRepository(private val pathToDir: String) {
     }
 
     private fun listCommits() {
-        println(commits)
+        commits.forEach(::println)
     }
 }
