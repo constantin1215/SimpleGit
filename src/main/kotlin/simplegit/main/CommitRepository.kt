@@ -1,4 +1,4 @@
-package simplegit.repository
+package simplegit.main
 
 import simplegit.hash.HashGenerator
 import simplegit.objects.Blob
@@ -34,33 +34,43 @@ class CommitRepository(private val pathToDir: String) {
             .forEach {
                 run {
                     val filePath = "$it".split(pathToDir).last().ifBlank { "/" }
-                    stagingStatus[STATUS.UNSTAGED]!!.add(filePath)
 
-                    val attributes = Files.readAttributes(it.toPath(), BasicFileAttributes::class.java)
+                    if (!stagingStatus[STATUS.STAGED]!!.contains(filePath) && !stagingStatus[STATUS.UNSTAGED]!!.contains(filePath)) {
+                        stagingStatus[STATUS.UNSTAGED]!!.add(filePath)
 
-                    if (attributes.isRegularFile && (filePath !in files)) {
-                        files.add(filePath)
-                        for (entry in directories.entries)
-                            if (filePath.substringBeforeLast("/").ifBlank { "/" } == entry.key)
-                                directories[entry.key]!!.add(filePath)
-                    }
+                        val attributes = Files.readAttributes(it.toPath(), BasicFileAttributes::class.java)
 
-                    if (attributes.isDirectory && (filePath !in directories)) {
-                        directories[filePath] = mutableListOf()
-                        for (entry in directories.entries)
-                        {
-                            val parent = filePath.substringBeforeLast("/").ifBlank { "/" }
-                            if (parent == entry.key)
-                                directories[entry.key]!!.add(filePath)
+                        if (attributes.isRegularFile && (filePath !in files)) {
+                            files.add(filePath)
+                            for (entry in directories.entries)
+                                if (filePath.substringBeforeLast("/").ifBlank { "/" } == entry.key)
+                                    directories[entry.key]!!.add(filePath)
                         }
-                    }
 
-                    directories["/"]!!.remove("/")
+                        if (attributes.isDirectory && (filePath !in directories)) {
+                            directories[filePath] = mutableListOf()
+                            for (entry in directories.entries)
+                            {
+                                val parent = filePath.substringBeforeLast("/").ifBlank { "/" }
+                                if (parent == entry.key)
+                                    directories[entry.key]!!.add(filePath)
+                            }
+                        }
+                        directories["/"]!!.remove("/")
+                    }
                 }
             }
     }
 
     private fun run() {
+        println("Hello! Welcome to:")
+        println("  _________.__                  .__              ________ .__   __   \n" +
+                " /   _____/|__|  _____  ______  |  |    ____    /  _____/ |__|_/  |_ \n" +
+                " \\_____  \\ |  | /     \\ \\____ \\ |  |  _/ __ \\  /   \\  ___ |  |\\   __\\\n" +
+                " /        \\|  ||  Y Y  \\|  |_> >|  |__\\  ___/  \\    \\_\\  \\|  | |  |  \n" +
+                "/_______  /|__||__|_|  /|   __/ |____/ \\___  >  \\______  /|__| |__|  \n" +
+                "        \\/           \\/ |__|               \\/          \\/            ")
+        println("\nType 'git help' to see available commands.")
         while (true) {
             print(">>>  ")
             val input = Scanner(System.`in`).nextLine()
@@ -71,6 +81,8 @@ class CommitRepository(private val pathToDir: String) {
                 "git ls-files" -> showDirectoryContent()
                 "git status" -> printStatus()
                 "git add" -> stageFiles(input.substringAfterLast(' '))
+                "git commit" -> commit(input)
+                "git log" -> listCommits()
                 "exit" -> {
                     println("Goodbye!")
                     return
@@ -86,6 +98,8 @@ class CommitRepository(private val pathToDir: String) {
         println("  git ls-files   - Show the content of the directory.")
         println("  git status     - Print the current staging status of files.")
         println("  git add        - Stage changes in the directory.")
+        println("  git commit     - Commits the staged files. It MUST contain the '-m' flag set the commit message.")
+        println("  git log        - List the commit history.")
         println("  exit           - Quit the Git command-line interface.")
     }
 
@@ -93,7 +107,7 @@ class CommitRepository(private val pathToDir: String) {
         if (path == ".")
             stage("/")
         else
-            println("Staging directories")
+            stage(path)
     }
 
     private fun enterCredentials() {
@@ -104,7 +118,7 @@ class CommitRepository(private val pathToDir: String) {
         println("Me Tarzan, You $currentUser :)")
     }
 
-    private fun commit(author : String, message : String) {
+    private fun commitFiles() {
         files.forEach {
             val content = File(pathToDir + it).readText()
             blobs[it] = Blob(HashGenerator.generateSHA1(it + content), content)
@@ -125,18 +139,26 @@ class CommitRepository(private val pathToDir: String) {
 
             trees[it.key]!!.recalculateHash()
         }
+    }
 
+    private fun commit(input : String) {
+        if (!input.contains("-m")) {
+            println("Command does not contain '-m' option so I cannot identify the commit message. :(")
+            return
+        }
+
+        commitFiles()
+
+        val message = input.substringAfterLast("-m")
         val date = LocalDateTime.now()
 
         val commit = Commit(
-            HashGenerator.generateSHA1("$author$message$date"),
-            author,
+            HashGenerator.generateSHA1("$currentUser$message$date"),
+            currentUser,
             message,
             date,
             trees["/"]!!
         )
-
-        println(commit)
 
         commits.add(commit)
     }
@@ -170,6 +192,8 @@ class CommitRepository(private val pathToDir: String) {
         if (fileName in files) {
             checkIfUnstaged(fileName)
             stageParents(fileName)
+            printStatus()
+            return
         }
         else if (fileName in directories.keys) {
             checkIfUnstaged(fileName)
@@ -190,11 +214,15 @@ class CommitRepository(private val pathToDir: String) {
                 }
             }
             stageParents(fileName)
+            printStatus()
+            return
         }
-        printStatus()
+
+        println("Nothing has been staged. Perhaps wrong path or file does not exists.")
     }
 
     private fun printStatus() {
+        scan()
         println("UNSTAGED: ${stagingStatus[STATUS.UNSTAGED]}")
         println("STAGED: ${stagingStatus[STATUS.STAGED]}")
     }

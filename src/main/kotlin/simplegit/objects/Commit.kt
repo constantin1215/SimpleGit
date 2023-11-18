@@ -10,6 +10,10 @@ class Commit(
     private val root : Tree
 ) {
     override fun toString(): String {
-        return "Commit(hash='$hash', author='$author', message='$message', commitTime=$commitTime, root=$root)"
+        return "Commit $hash\n" +
+                "Root ID: ${root.hash}\n" +
+                "Author: $author\n" +
+                "Date: $commitTime\n\n" +
+                "$message\n"
     }
 }
